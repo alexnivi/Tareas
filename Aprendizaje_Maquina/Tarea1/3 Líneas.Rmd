@@ -1,0 +1,204 @@
+---
+title: "Tarea 1"
+author: "Alejandro Nivón Ruiz 109649"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+En el ejemplo simple que vimos en la sección 1.4, utilizamos una sola muestra de entrenamiento para evaluar el algoritmo. ¿Será posible que escogimos una muestra atípica?
+
+ - Corre el ejemplo con otra muestra y reporta tus resultados de error de entrenamiento y error de prueba para los tres métodos.
+ - Opcional (difícil): evalúa los tres métodos comparando estos valores para un número grande de distintas simulaciones de los datos de entrenamiento.
+
+
+## Ejercicio: ¿Que curva preferirías para predecir, la gris, la roja o la azul? ¿Cuál tiene menor error de entrenamiento?
+
+
+Vamos a usar simulación para entender estas ideas: supongamos que $X$ es el número de años de estudio de una persona y $Y$ es su ingreso mensual. En primer lugar, estas son el número de años de estudio de 8 personas y supondremos que la dependencia de Y de X está dada por:
+$Y = f(X)+ \epsilon$ una función  $f$ que no conocemos (esta función está determinada por el fenómeno)
+
+```{r}
+x <- c(1,7,10,0,0,5,9,13,2,4,17,18,1,2)
+
+f <- function(x){
+  ifelse(x < 10, 1000*sqrt(x), 1000*sqrt(10))
+}
+```
+
+El ingreso no se determina únicamente por número de años de estudio. Suponemos entonces que hay algunas variables adicionales que perturban los niveles de $f(x)$ por una cantidad aleatoria. Los valores que observamos de $Y$ están dados entonces por $Y = f(X)+\epsilon$.
+
+Entonces podríamos obtener, por ejemplo:
+
+```{r}
+x_g <- seq(0,20,0.5)
+y_g <- f(x_g)
+dat_g <- data.frame(x = x_g, y = y_g)
+set.seed(281)
+error <- rnorm(length(x), 0, 500)
+y <- f(x) + error
+datos <- data_frame(x = x, y = y)
+datos$y_media <- f(datos$x)
+ggplot(datos, aes(x = x, y = y)) + geom_point() +
+  geom_line(data=dat_g, colour = 'blue', size = 1.1) +
+  geom_segment(aes(x = x, xend = x, y = y, yend = y_media), col='red')
+```
+
+En problemas de aprendizaje nunca conocemos esta $f$ verdadera, aunque quizá sabemos algo acerca de sus propiedades (por ejemplo, continua, de variación suave). Lo que tenemos son los datos, que también podrían haber resultado en (para otra muestra de personas, por ejemplo):
+
+```{r cars, warning=FALSE, echo=FALSE}
+set.seed(280572)
+error <- rnorm(length(x), 0, 500)
+y <- f(x) + error
+datos_entrena <- data.frame(x=x, y=y)
+
+curva_1 <- geom_smooth(data=datos_entrena,
+  method = "loess", se=FALSE, color="gray30", span=1, size=1.1)
+curva_2 <- geom_smooth(data=datos_entrena,
+  method = "loess", se=FALSE, color="red", span=0.5, size=1.1)
+curva_3 <- geom_smooth(data=datos_entrena,
+  method = "lm", se=FALSE, color="blue", size=1.1)
+
+ggplot(datos_entrena, aes(x=x, y=y)) + geom_point() + 
+    curva_1 + curva_2 + curva_3
+```
+
+Estos son los errores observados en clase:
+
+```{r, warning=FALSE, echo=FALSE, results=TRUE}
+
+mod_rojo <- loess(y ~ x, data = datos_entrena, span=0.3)
+mod_gris <- loess(y ~ x, data = datos_entrena, span=1)
+mod_recta <- lm(y ~ x, data = datos_entrena)
+df_mods <- data_frame(nombre = c('recta', 'rojo','gris'))
+df_mods$modelo <- list(mod_recta, mod_rojo, mod_gris)
+
+error_f <- function(df, mod){
+  function(mod){
+    preds <- predict(mod, newdata = df)
+    round(sqrt(mean((preds - df$y) ^ 2)))
+  }
+}
+
+error_ent <- error_f(datos_entrena)
+
+df_mods <- df_mods %>% 
+  mutate(error_entrena = map_dbl(modelo, error_ent))
+
+
+set.seed(218052272)
+x_0 <- sample(0:13, 100, replace = T)
+error <- rnorm(length(x_0), 0, 500)
+y_0 <- f(x_0) + error
+datos_prueba <- data_frame(x = x_0, y = y_0)
+error_p <- error_f(datos_prueba)
+df_mods <- df_mods %>% 
+  mutate(error_prueba = map_dbl(modelo, error_p))
+df_mods
+
+```
+
+## Muestra adicional de mayor tamaño para evaluar los tres modelos.
+
+Se obtiene una muestra nueva, esta vez lo haremos de tamaño 50 para el entrenamiento y 20 para la prueba.
+Después se ajustarán las 3 curvas para la base de entrenamiento.
+
+```{r}
+x_ent <- runif(50, 0, 35)
+y_ent <- f(x_ent)
+dat_ent <- data.frame(x = x_ent, y = y_ent)
+
+x_prb <-runif(20, 0, 35)
+y_prb <- f(x_prb)
+dat_prb <- data.frame(x = x_prb, y = y_prb)
+
+
+```
+
+Observamos el comportamiento de cada curva para la muestra de entrenamiento:
+
+```{r, warning=FALSE, echo = FALSE}
+curva_1 <- geom_smooth(data=dat_ent,
+  method = "loess", se=FALSE, color="gray30", span=1, size=1.1)
+curva_2 <- geom_smooth(data=dat_ent,
+  method = "loess", se=FALSE, color="red", span=0.5, size=1.1)
+curva_3 <- geom_smooth(data=dat_ent,
+  method = "lm", se=FALSE, color="blue", size=1.1)
+
+ggplot(datos_entrena, aes(x=x, y=y)) + geom_point() + 
+    curva_1 + curva_2 + curva_3
+
+```
+
+Errores de entrenamiento y prueba:
+
+```{r, warning=FALSE}
+
+mod_rojo <- loess(y ~ x, data = dat_ent, span=0.3)
+mod_gris <- loess(y ~ x, data = dat_ent, span=1)
+mod_recta <- lm(y ~ x, data = dat_ent)
+errores <- data_frame(nombre = c('recta', 'rojo','gris'))
+errores$modelo <- list(mod_recta, mod_rojo, mod_gris)
+
+
+error_ent <- error_f(dat_ent)
+error_prb <- error_f(dat_prb)
+
+errores <- errores %>% 
+  mutate(error_ent = map_dbl(modelo, error_ent)) %>% 
+  mutate(error_prueba = map_dbl(modelo, error_prb))
+
+print(errores)
+
+errores <- errores %>% gather(error, valor, error_ent:error_prueba)
+
+
+ggplot(data=errores, aes(x=nombre, y=valor, fill=error)) +
+    geom_bar(stat="identity", position=position_dodge()) +
+    ggtitle("Errores de estimación: Segunda muestra")
+
+```
+
+## Simulaciones de datos de entrenamiento.
+
+Se repite el ejercicio con 1,000 muestras de tamaño 30 de los datos de entrenamiento.
+Se hacen histogramas de los valores de los errores
+```{r}
+
+er_rojo <- c()
+er_gris <- c()
+er_recta <- c()
+
+for (i in 1:1000){
+  
+  x_ent <- runif(30, 0, 35)
+  y_ent <- f(x_ent)
+  dat_ent <- data.frame(x = x_ent, y = y_ent)
+  error_ent <- error_f(dat_ent)
+  
+  mod_rojo <- loess(y ~ x, data = dat_ent, span=0.3)
+  mod_gris <- loess(y ~ x, data = dat_ent, span=1)
+  mod_recta <- lm(y ~ x, data = dat_ent)
+  modelo <- list(mod_rojo, mod_gris, mod_recta)
+  
+  error_ent = map_dbl(modelo, error_ent)
+  
+  er_rojo <- c(er_rojo, error_ent[1])
+  er_gris <- c(er_gris, error_ent[2])
+  er_recta <- c(er_recta, error_ent[3])
+  
+}
+
+ggplot() + aes(er_rojo)+ geom_histogram(bins=60, colour="black", fill="red") + 
+  ggtitle("Errores de entrenamiento: Modelo Rojo")
+
+ggplot() + aes(er_gris)+ geom_histogram(bins=60, colour="black", fill="gray30") + 
+  ggtitle("Errores de entrenamiento: Modelo Gris")
+
+ggplot() + aes(er_recta)+ geom_histogram(bins=60, colour="black", fill="blue") + 
+  ggtitle("Errores de entrenamiento: Modelo Recta")
+```
+

@@ -1,0 +1,76 @@
+---
+title: 'Tarea1: Gapminder'
+author: "Alejandro Nivón Ruiz 109649"
+date: "20 de agosto de 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(gapminder)
+library(Hmisc)
+library(tidyverse)
+library(ggplot2)
+```
+
+Tarea. Explora la base de datos gapminder, estos datos están incluidos en el paquete del mismo nombre, para acceder a ellos basta con cargar el paquete.
+
+realiza al menos 3 gráficas y explica las relaciones que encuentres. Debes usar lo que revisamos en estas notas: al menos una de las gráficas debe ser de páneles, realiza una gráfica con datos de México, y (opcional)si lo consideras interesante, puedes crear una variable categórica utilizando la función cut2 del paquete Hmisc.
+
+## Excerpt of the Gapminder data on life expectancy, GDP per capita, and population by country
+```{r gapminder}
+gapminder %>% head()
+gapminder %>% summary()
+```
+
+## Algunas gráficas explorando Datos
+
+Primero se comparará la evolución de la esperanza de vida promedio por continente a través del tiempo.
+
+```{r}
+cont <- gapminder %>% select(c(continent, year, lifeExp)) %>%  group_by(continent, year)%>% 
+  summarise(lifeExp = mean(lifeExp))
+
+ggplot(cont, aes(x = year, y = lifeExp, colour = continent)) + facet_wrap(~ continent) + 
+  geom_line(size=1)
+```
+
+Al comparar los niveles de esperanza de vida promedio ante la misma escala se pueden ver crecimioentos sostenidos o a tasas positivas en todos los continentes excepto en Africa, los continentes con mayor espertanza de vida promedio al 2007 son Oceanía y Europa.
+Los continentes con el mayor avance proprcional en esperanza de vida en el lapso 1950-2007 son Asia y América.
+
+
+Para el caso de México se puede comparar la evolución versus todo el continente:
+
+```{r}
+America <- cont %>% filter(continent == 'Americas')
+Mexico <- gapminder %>% select(c(country, year, lifeExp)) %>% filter(country == 'Mexico')
+
+ggplot() + ggtitle('Evolución de la esperanza de vida en México vs promedio América') +
+  labs(x = "Year",  y='Life Expectancy') +
+  geom_line(aes(x=America$year, y=America$lifeExp, color='América'), show.legend = TRUE) +
+  geom_line(aes(x=Mexico$year, y=Mexico$lifeExp, color='México'), show.legend = TRUE) +
+  scale_color_manual('Entidades', values = c('blue', 'red'))
+```
+
+Aquí podemos ver que cerca de 1975 México superó el promedio de expectativa de vida en América.
+
+Una cuestión interesante para México sería la de ver la relación entre la expectativa de vida y la población.
+
+```{r, message=FALSE}
+Mexico <- gapminder %>% select(c(country, year, lifeExp, pop)) %>% filter(country == 'Mexico')
+
+ggplot(Mexico) + geom_point(aes(x=lifeExp, y=pop), size=2.5) + geom_smooth(aes(x=lifeExp, y=pop), show.legend = TRUE) +
+  ggtitle('México: Relación de expectativa de vida vs tamaño poblacional')
+```
+
+Se nota la alta relación entre ambas variables, al menos para el caso de México.
+
+En cuanto a la producción per cápita en México:
+```{r, message=FALSE}
+Mexico <- gapminder %>% select(c(country, year, lifeExp, pop, gdpPercap)) %>% filter(country == 'Mexico')
+ggplot(Mexico) + geom_point(aes(y=gdpPercap, x=pop), size=1.5) + ggtitle('México: PIB per cápita vs tamaño poblacional')  +
+  geom_smooth(aes(y=gdpPercap, x=pop))
+
+```
+
+También pude notarse una asociación postiva entre estas variables.
